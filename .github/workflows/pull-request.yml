@@ -11,21 +11,39 @@ permissions:
   id-token: write
 
 jobs:
-  ci:
-    runs-on: ubuntu-26.04
-    environment: external-ci # use this to set up required reviewers
+  # Job 1: Run pre-requisite steps & capture credentials into outputs
+  setup:
+    runs-on: ubuntu-24.04
+    environment: external-ci # 🔐 Pauses here for maintainer approval before fetching credentials
+
+    # Expose step outputs as job outputs so the reusable workflow can read them
+    outputs:
+      cache_registry: ${{ steps.fork-creds.outputs.registry_url }} # Adjust key to match your action's output
+      cache_user: ${{ steps.fork-creds.outputs.registry_user }}
+      cache_password: ${{ steps.fork-creds.outputs.registry_password }}
+
     steps:
-      - uses: actions/checkout@v4 # Go get to get-registry-creds/action.yml
+      - name: Checkout PR Code
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           allow-unsafe-pr-checkout: true
+
       - name: Fetch Registry Credentials for Fork PR
         id: fork-creds
         uses: ./.github/actions/get-registry-creds
         with:
           auth_service_url: "https://portal.webhare.com/portalapi/ci/get-buildcache-token"
           audience: "https://portal.webhare.com"
-      - name: Call CI workflow
-        uses: ./.github/workflows/ci.yml
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
+
+  # Job 2: Call reusable workflow and pass the output from Job 1
+  ci:
+    needs: setup # 👈 Wait for setup job to complete
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ github.event.pull_request.head.sha }}
+    secrets:
+      # Pass the dynamic credential output into ci.yml as a secret
+      cache_registry: ${{ needs.setup.outputs.cache_registry }}
+      cache_user: ${{ needs.setup.outputs.cache_user }}
+      cache_password: ${{ needs.setup.outputs.cache_password }}
