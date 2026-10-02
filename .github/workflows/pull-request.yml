@@ -1,4 +1,3 @@
-# Run the 'pull' step for external pull requests. If we try this inside ci.yml we ended up with dozens of skipped dupe jobs
 name: External Pull Request CI
 
 on:
@@ -16,27 +15,16 @@ jobs:
     runs-on: ubuntu-26.04
     environment: external-ci # use this to set up required reviewers
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4 # Go get to get-registry-creds/action.yml
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       - name: Fetch Registry Credentials for Fork PR
         id: fork-creds
-        # if: ${{ github.event.pull_request.head.repo.fork }} # FIXME re-add for testing
         uses: ./.github/actions/get-registry-creds
         with:
           auth_service_url: "https://portal.webhare.com/portalapi/ci/get-buildcache-token"
           audience: "https://portal.webhare.com"
-      - name: Trigger Fork CI via Workflow Dispatch
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-          PR_SHA: ${{ github.event.pull_request.head.sha }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          gh workflow run ci.yml \
-            --repo "${{ github.repository }}" \
-            --ref "${{ github.event.repository.default_branch }}" \
-            -f pr_repo="$PR_REPO" \
-            -f pr_sha="$PR_SHA" \
-            -f pr_number="$PR_NUMBER" \
-            -f cache_registry="${{ steps.fork-creds.outputs.registry_url }}" \
-            -f cache_user="${{ steps.fork-creds.outputs.registry_user }}" \
-            -f cache_password="${{ steps.fork-creds.outputs.registry_password }}"
+      - name: Call CI workflow
+        uses: ./.github/workflows/ci.yml
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
