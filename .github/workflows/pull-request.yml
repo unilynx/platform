@@ -6,6 +6,7 @@ on:
     types: [opened, synchronize, reopened]
 
 permissions:
+  actions: write
   contents: read
   packages: write
   id-token: write
@@ -26,7 +27,6 @@ jobs:
       - name: Trigger Fork CI via Workflow Dispatch
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.REPO_ADMIN_OR_PAT_TOKEN }}
           script: |
             await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
