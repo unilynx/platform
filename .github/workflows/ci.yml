@@ -63,7 +63,9 @@ jobs:
         env:
           CI_REGISTRY_USER: ${{ inputs.cache_user || github.actor }}
           CI_REGISTRY_PASSWORD: ${{ inputs.cache_password || secrets.GITHUB_TOKEN }}
-        run: echo "$CI_REGISTRY_PASSWORD" | podman login "$CI_REGISTRY_IMAGE" --username "$CI_REGISTRY_USER" --password-stdin
+        run: |
+          echo "::add-mask::$CI_REGISTRY_PASSWORD"
+          echo "$CI_REGISTRY_PASSWORD" | podman login "$CI_REGISTRY_IMAGE" --username "$CI_REGISTRY_USER" --password-stdin
       - name: Build and push WebHare container
         env:
           PUSH_BUILD_IMAGES: "1"
