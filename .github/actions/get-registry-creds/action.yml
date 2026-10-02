@@ -1,0 +1,60 @@
+name: "Get Temporary Registry Credentials via OIDC"
+description: "Fetches temporary registry credentials from external service for fork PRs"
+
+inputs:
+  auth_service_url:
+    description: "The HTTPS URL of the external token exchange service"
+    required: true
+  audience:
+    description: "The expected audience configured on the auth service"
+    required: false
+    default: "https://auth.yourdomain.com"
+
+outputs:
+  registry_url:
+    description: "Container registry URL"
+    value: ${{ steps.exchange.outputs.registry_url }}
+  registry_user:
+    description: "Container registry username"
+    value: ${{ steps.exchange.outputs.registry_user }}
+  registry_password:
+    description: "Container registry short-lived password"
+    value: ${{ steps.exchange.outputs.registry_password }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Fetch and Exchange OIDC Token
+      id: exchange
+      shell: bash
+      run: |
+        # 1. Fetch GitHub OIDC JWT Token
+        OIDC_TOKEN=(ACTIONS_ID_TOKEN_REQUEST_TOKEN=$ACTIONS_ID_TOKEN_REQUEST_TOKEN \
+                    ACTIONS_ID_TOKEN_REQUEST_URL=$ACTIONS_ID_TOKEN_REQUEST_URL \
+                    curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+                          "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${{ inputs.audience }}" | jq -r '.value')
+
+        if [ -z "$OIDC_TOKEN" ] || [ "$OIDC_TOKEN" == "null" ]; then
+          echo "::error::Failed to fetch GitHub OIDC Token"
+          exit 1
+        fi
+
+        # 2. POST to external verification service
+        RESPONSE=$(curl -s -X POST "${{ inputs.auth_service_url }}" \
+                        -H "Content-Type: application/json" \
+                        -d "{\"token\": \"$OIDC_TOKEN\"}")
+
+        REGISTRY_URL=$(echo "$RESPONSE" | jq -r '.registry_url')
+        REGISTRY_USER=$(echo "$RESPONSE" | jq -r '.username')
+        REGISTRY_PASSWORD=$(echo "$RESPONSE" | jq -r '.password')
+
+        if [ -z "$REGISTRY_PASSWORD" ] || [ "$REGISTRY_PASSWORD" == "null" ]; then
+          echo "::error::Failed to exchange OIDC token for registry credentials: $RESPONSE"
+          exit 1
+        fi
+
+        # 3. Mask sensitive output in logs and set step outputs
+        echo "::add-mask::$REGISTRY_PASSWORD"
+        echo "registry_url=$REGISTRY_URL" >> "$GITHUB_OUTPUT"
+        echo "registry_user=$REGISTRY_USER" >> "$GITHUB_OUTPUT"
+        echo "registry_password=$REGISTRY_PASSWORD" >> "$GITHUB_OUTPUT"

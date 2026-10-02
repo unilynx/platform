@@ -11,7 +11,6 @@ on:
         default: false
 
 env:
-  CI_REGISTRY_IMAGE: ghcr.io/${{ github.repository }}
   CI_COMMIT_SHA: ${{ github.sha }}
   CI_COMMIT_REF_SLUG: ci-${{ github.run_id }}
   GIT_SUBMODULE_STRATEGY: recursive
@@ -33,22 +32,28 @@ jobs:
     name: Build container
     # See https://github.com/actions/runner-images
     runs-on: ubuntu-26.04
-    environment: ${{ github.event.pull_request.head.repo.fork && 'external-forks' || null }}
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - name: DEBUG RUNNING FOR
-        run: echo "Running for ${{ github.event.pull_request.head.repo.fork }} with ${{ vars.CI_REGISTRY_IMAGE }}"
-      - name: Set container registry image to ghcr.io fallback
-        env: # can't do it a top level, environment won't be selected yet and vars are usless
-          CI_REGISTRY_IMAGE: ${{ vars.CI_REGISTRY_IMAGE }}
+      - name: Fetch Registry Credentials for Fork PR
+        id: fork-creds
+        # if: ${{ github.event.pull_request.head.repo.fork }} # FIXME re-add for testing
+        uses: ./.github/actions/get-registry-creds
+        with:
+          auth_service_url: "https://portal.webhare.com/portalapi/ci/get-buildcache-token"
+          audience: "https://portal.webhare.com"
+      - name: Set CI_REGISTRY_IMAGE to retrieved value or fallback to ghcr.io
+        env:
+          CI_REGISTRY_IMAGE: ${{ steps.fork-creds.outputs.registry_url }}
         if: ${{ env.CI_REGISTRY_IMAGE == '' }}
-        run: echo "CI_REGISTRY_IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+        run: |
+          [ -n "$CI_REGISTRY_IMAGE" ] || CI_REGISTRY_IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"
+          echo "CI_REGISTRY_IMAGE=$CI_REGISTRY_IMAGE" >> "$GITHUB_ENV"
       - name: Log in to registry with Podman
         env:
-          CI_REGISTRY_USER: ${{ vars.CI_REGISTRY_USER || github.actor }}
-          CI_REGISTRY_PASSWORD: ${{ vars.CI_REGISTRY_PASSWORD || secrets.GITHUB_TOKEN }}
+          CI_REGISTRY_USER: ${{ steps.fork-creds.outputs.username || github.actor }}
+          CI_REGISTRY_PASSWORD: ${{ steps.fork-creds.outputs.password || secrets.GITHUB_TOKEN }}
         run: echo "$CI_REGISTRY_PASSWORD" | podman login "$CI_REGISTRY_IMAGE" --username "$CI_REGISTRY_USER" --password-stdin
       - name: Build and push WebHare container
         env:
