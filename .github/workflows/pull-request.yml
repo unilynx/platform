@@ -18,6 +18,7 @@ jobs:
       - uses: actions/checkout@v4 # Go get to get-registry-creds/action.yml
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          allow-unsafe-pr-checkout: true
       - name: Fetch Registry Credentials for Fork PR
         id: fork-creds
         uses: ./.github/actions/get-registry-creds
