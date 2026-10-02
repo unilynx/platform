@@ -10,9 +10,13 @@ on:
         description: 'Cache user'
       cache_password:
         description: 'Cache password'
+      pr_repo:
+        description: 'PR Repository Full Name'
+      pr_sha:
+        description: 'PR Commit SHA'
       pr_number:
         description: 'PR Number'
-        required: true
+
   workflow_call:
     inputs:
       scheduled:
@@ -46,6 +50,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          repository: ${{ inputs.pr_repo || github.repository }}
+          ref: ${{ inputs.pr_sha || github.sha }}
           submodules: recursive
       - name: Set CI_REGISTRY_IMAGE to retrieved value or fallback to ghcr.io
         env:

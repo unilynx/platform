@@ -25,18 +25,18 @@ jobs:
           auth_service_url: "https://portal.webhare.com/portalapi/ci/get-buildcache-token"
           audience: "https://portal.webhare.com"
       - name: Trigger Fork CI via Workflow Dispatch
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'ci.yml',
-              ref: context.payload.pull_request.head.ref,
-              inputs: {
-                cache_registry: '${{ steps.fork-creds.outputs.registry_url }}',
-                cache_user: '${{ steps.fork-creds.outputs.registry_user }}',
-                cache_password: '${{ steps.fork-creds.outputs.registry_password }}',
-                pr_number: '${{ github.event.pull_request.number }}'
-              }
-            });
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh workflow run pr-ci.yml \
+            --repo "${{ github.repository }}" \
+            --ref "${{ github.event.repository.default_branch }}" \
+            -f pr_repo="$PR_REPO" \
+            -f pr_sha="$PR_SHA" \
+            -f pr_number="$PR_NUMBER"
+            -f cache_registry="${{ steps.fork-creds.outputs.registry_url }}" \
+            -f cache_user="${{ steps.fork-creds.outputs.registry_user }}" \
+            -f cache_password="${{ steps.fork-creds.outputs.registry_password }}"
