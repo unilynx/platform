@@ -31,7 +31,7 @@ jobs:
           PR_SHA: ${{ github.event.pull_request.head.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          gh workflow run pr-ci.yml \
+          gh workflow run ci.yml \
             --repo "${{ github.repository }}" \
             --ref "${{ github.event.repository.default_branch }}" \
             -f pr_repo="$PR_REPO" \
