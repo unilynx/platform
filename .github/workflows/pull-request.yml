@@ -36,7 +36,7 @@ jobs:
             --ref "${{ github.event.repository.default_branch }}" \
             -f pr_repo="$PR_REPO" \
             -f pr_sha="$PR_SHA" \
-            -f pr_number="$PR_NUMBER"
+            -f pr_number="$PR_NUMBER" \
             -f cache_registry="${{ steps.fork-creds.outputs.registry_url }}" \
             -f cache_user="${{ steps.fork-creds.outputs.registry_user }}" \
             -f cache_password="${{ steps.fork-creds.outputs.registry_password }}"
